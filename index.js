@@ -36,7 +36,9 @@ const app = express();
 app.use(cors());
 app.options('*', cors());
 app.enable('trust proxy');
-
+app.get('/', (req , res) =>{
+  res.json({msg:"Hello User App is running"})
+})
 // Add hook here before we call body parser, because stripe will send data in the body in form raw
 app.post(
   '/webhook-checkout',
