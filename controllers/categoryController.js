@@ -1,58 +1,41 @@
-const sharp = require('sharp'); // image processing lib for nodejs
-const { v4: uuidv4 } = require('uuid');
-const asyncHandler = require('express-async-handler');
+const { v4: uuidv4 } = require("uuid");
+const asyncHandler = require("express-async-handler");
+const streamifier = require("streamifier");
 
-const factory = require('./handlersFactory');
-const { uploadSingleImage } = require('../middlewares/imageUpload');
-const Category = require('../models/categoryModel');
+const factory = require("./handlersFactory");
+const { uploadSingleImage } = require("../middlewares/imageUpload");
+const cloudinary = require("../utils/cloudinary");
+const Category = require("../models/categoryModel");
 
-// 1- Use diskStorage Engine (configure destination & image name)
-// const multerStorage = multer.diskStorage({
-//   destination: function (req, file, cb) {
-//     cb(null, 'uploads/categories');
-//   },
-//   filename: function (req, file, cb) {
-//     const ext = file.mimetype.split('/')[1];
-//     const filename = `category-${uuidv4()}-${Date.now()}.${ext}`;
-//     cb(null, `${filename}`);
-//   },
-// });
+exports.uploadCategoryImage = uploadSingleImage("image");
 
-// 2- Use a memory storage to store files on a memory as a buffer to make image processing
-// const multerStorage = multer.memoryStorage();
-
-// Accept only images
-// const multerFilter = (req, file, cb) => {
-//   if (!req.body.name) {
-//     cb(new ApiError('Category name required', 400), false);
-//   } else if (file.mimetype.startsWith('image')) {
-//     cb(null, true);
-//   } else {
-//     cb(new ApiError('only images allowed', 400), false);
-//   }
-// };
-
-// const upload = multer({ storage: multerStorage, fileFilter: multerFilter });
-
-// exports.uploadCategoryImage = upload.single('image');
-exports.uploadCategoryImage = uploadSingleImage('image');
-
-// Resize image
+/// Resize image (upload to Cloudinary instead of local storage)
 exports.resizeImage = asyncHandler(async (req, res, next) => {
   if (!req.file) return next();
 
-  // req.file.filename = `category-${uuidv4()}-${Date.now()}.jpeg`;
-  const ext = req.file.mimetype.split('/')[1];
-  const filename = `category-${uuidv4()}-${Date.now()}.${ext}`;
+  const uploadFromBuffer = (fileBuffer) => {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "Ecommerce/categories",
+          public_id: `category-${uuidv4()}-${Date.now()}`,
+        },
+        (error, result) => {
+          if (result) resolve(result);
+          else reject(error);
+        }
+      );
+      streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+    });
+  };
 
-  await sharp(req.file.buffer)
-    // .resize(500, 500)
-    .toFile(`../uploads/categories/${filename}`); // write into a file on the disk
+  const result = await uploadFromBuffer(req.file.buffer);
 
-  req.body.image = filename;
+  // Here we are directly using the Cloudinary URL to save in the database
+  req.body.image = result.secure_url; // This should now have the Cloudinary URL without any local URL prefix
+
   next();
 });
-
 // @desc      Get all categories
 // @route     GET /api/v1/categories
 // @access    Public

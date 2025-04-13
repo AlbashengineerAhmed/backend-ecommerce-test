@@ -82,6 +82,14 @@ const productSchema = new mongoose.Schema(
 //   foreignField: 'product',
 //   localField: '_id',
 // });
+const slugify = require("slugify");
+
+productSchema.pre("save", function (next) {
+  if (this.title) {
+    this.slug = slugify(this.title, { lower: true });
+  }
+  next();
+});
 
 // Virtual populate: populate review on the product (review pointing to the product not the product pointing to the review) the parent (product) does not know about the child (review)
 productSchema.virtual('reviews', {

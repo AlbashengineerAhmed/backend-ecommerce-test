@@ -31,9 +31,9 @@ more resources. this size of Indexes is bigger than the size of collection itsel
 categorySchema.index({ name: 1 });
 
 const setImageUrl = (doc) => {
-  if (doc.image) {
-    const imageUrl = `${process.env.BASE_URL}/categories/${doc.image}`;
-    doc.image = imageUrl;
+  if (doc.image && !doc.image.startsWith("https://res.cloudinary.com/")) {
+    // If you want to prevent saving any local URLs, just ignore this logic
+    doc.image = ""; // Set the local URL to an empty string if you don't want to save it
   }
 };
 

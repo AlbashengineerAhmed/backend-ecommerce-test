@@ -1,28 +1,49 @@
-const sharp = require('sharp');
-const { v4: uuidv4 } = require('uuid');
-const asyncHandler = require('express-async-handler');
+const sharp = require("sharp");
+const { v4: uuidv4 } = require("uuid");
+const asyncHandler = require("express-async-handler");
+const streamifier = require("streamifier"); // Add this
+const cloudinary = require("../utils/cloudinary"); // Add this
 
-const factory = require('./handlersFactory');
-const { uploadSingleImage } = require('../middlewares/imageUpload');
-const Brand = require('../models/brandModel');
+const factory = require("./handlersFactory");
+const { uploadSingleImage } = require("../middlewares/imageUpload");
+const Brand = require("../models/brandModel");
 
-exports.uploadBrandImage = uploadSingleImage('image');
+exports.uploadBrandImage = uploadSingleImage("image");
 
-// Resize image
+// Upload image to Cloudinary
 exports.resizeImage = asyncHandler(async (req, res, next) => {
   if (!req.file) return next();
 
-  // req.file.filename = `category-${uuidv4()}-${Date.now()}.jpeg`;
-  const ext = req.file.mimetype.split('/')[1];
-  const filename = `brand-${uuidv4()}-${Date.now()}.${ext}`;
+  try {
+    const ext = req.file.mimetype.split("/")[1];
+    if (!["jpg", "jpeg", "png", "gif"].includes(ext)) {
+      return next(new ApiError("Invalid image format", 400));
+    }
 
-  await sharp(req.file.buffer)
-    // .resize(500, 500)
-    // .toFormat('jpeg')
-    // .jpeg({ quality: 90 })
-    .toFile(`../uploads/brands/${filename}`); // write into a file on the disk
-  console.log(filename);
-  req.body.image = filename;
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "Ecommerce/brands",
+          public_id: `brand-${uuidv4()}-${Date.now()}`,
+          format: ext,
+          transformation: [
+            { width: 800, height: 800, crop: "limit", quality: "auto" },
+          ],
+        },
+        (error, result) => {
+          if (result) resolve(result);
+          else reject(new ApiError("Error uploading brand image", 500));
+        }
+      );
+
+      streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    });
+
+    req.body.image = result.secure_url;
+  } catch (error) {
+    return next(error);
+  }
+
   next();
 });
 

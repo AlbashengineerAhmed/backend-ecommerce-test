@@ -1,22 +1,25 @@
-const multer = require('multer');
+const multer = require("multer");
+const ApiError = require("../utils/apiError");
 
-const ApiError = require('../utils/apiError');
+const multerStorage = multer.memoryStorage();
 
-// Upload single image => method return multer middleware
-exports.uploadSingleImage = (fieldName) => {
-  // Storage
-  const multerStorage = multer.memoryStorage();
-
-  // Accept only images
-  const multerFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('image')) {
-      cb(null, true);
-    } else {
-      cb(new ApiError('only images allowed', 400), false);
-    }
-  };
-
-  const upload = multer({ storage: multerStorage, fileFilter: multerFilter });
-
-  return upload.single(fieldName);
+const multerFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image")) {
+    cb(null, true);
+  } else {
+    cb(new ApiError("Only images are allowed", 400), false);
+  }
 };
+
+const upload = multer({
+  storage: multerStorage,
+  fileFilter: multerFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+
+exports.uploadSingleImage = (fieldName) => upload.single(fieldName);
+exports.uploadMultipleImages = (fieldName, maxCount = 5) =>
+  upload.array(fieldName, maxCount);
+
+// ✅ New helper for multiple fields
+exports.uploadMixedImages = (fieldsArray) => upload.fields(fieldsArray);
